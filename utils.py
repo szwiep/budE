@@ -146,7 +146,7 @@ class Images:
         self.root_dir = root_dir
         name = files[index]
         self.rgb_image = read_image(os.path.join(self.root_dir, name))
-        name = name.replace(".tif", "")
+        name = name.replace(".tif", "") # Added for IM2ELE/Aerial data
         name = name.replace(".png", "")
         name = name.replace(".jpeg", "")
         name = name.replace(".jpeg", "")

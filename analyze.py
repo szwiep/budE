@@ -6,6 +6,8 @@ from skimage.measure import compare_ssim
 import cv2
 import os
 
+import midas.utils
+
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from skimage.metrics import structural_similarity
@@ -125,7 +127,6 @@ def center_crop(img, dim):
 	crop_img = img[mid_y-ch2:mid_y+ch2, mid_x-cw2:mid_x+cw2]
 	return crop_img
 
-
 if __name__ == '__main__':
 
     single_ssims = np.zeros(367)
@@ -168,6 +169,7 @@ if __name__ == '__main__':
         # cv2.waitKey(0)
 
         blurred_gray = cv2.cvtColor(blurred_boost, cv2.COLOR_BGR2GRAY)
+        midas.utils.write_depth(f'outputs/max_700_R0_all/{low_est_filename}_blur', blurred_boost, bits=2, colored=False)
 
         ##########################################################
         # SSIM Stuff (How has the structure changes)
