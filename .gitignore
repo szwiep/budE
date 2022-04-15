@@ -1,7 +1,8 @@
 /.idea
-/pix2pix/checkpoints
-/midas/model-f46da743.pt
-/midas/model.pt
+boostingMonocularDepth/pix2pix/checkpoints
+
+boostingMonocularDepth/midas/model-f46da743.pt
+boostingMonocularDepth/midas/model.pt
 /structuredrl/model.pth.tar
 dataset_prepare/midas/model.pt
 /results
@@ -18,7 +19,9 @@ dataset_prepare/midas/model.pt
 */**/__pycache__
 
 /test_heights_adjust
-/outputs/*/
-/im2ele/Block_skip_model_110.pth.tar
+/test_rgbs_base
+/outputs
+/inputs
+/im2ele/Block0_skip_model_110.pth.tar
 /im2ele/models/senet154-c7b49a05.pth
 *.csv

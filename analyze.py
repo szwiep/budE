@@ -6,42 +6,11 @@ from skimage.measure import compare_ssim
 import cv2
 import os
 
-import midas.utils
+import boostingMonocularDepth.midas.utils
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from skimage.metrics import structural_similarity
-
-
-# def get_original_boost_difference(single, boost, rgb):
-#     '''
-#         single: NumPy array of first (orignial) depth estimation
-#         boost: NumPy array of original depth estimation
-#         rgb: NumPy array of original RGB image
-#     '''
-
-#     diff = np.abs(boost - single)
-#     print(diff)
-
-    
-#     fig, axs = plt.subplots(1, 3)
-#     fig.suptitle('Horizontally stacked subplots')
-#     axs[0].imshow(single)
-#     axs[1].imshow(boost)
-#     axs[2].imshow(diff, cmap='jet')
-    
-#     # fig = Figure()
-#     # canvas = FigureCanvas(fig)
-#     # ax1 = fig.add_subplot(1, 3, 1)
-#     # ax1.imshow(single)
-
-#     # ax2 = fig.add_subplot(1, 3, 2)
-#     # ax2.imshow(boost)
-
-#     # ax3 = fig.add_subplot(1, 3, 3)
-#     # ax3.imshow(diff, cmap='gist_heat')
-#     # fig.show()
-#     plt.show()
 
 def show_structural_differences(gray_single, gray_boost):
     
@@ -110,6 +79,55 @@ def compare_SSIM(single, boost, ground_truth):
 
     return score, boost_score
 
+def join_depth_estimations(images):
+    ''' A naive join of NxN depth estimation images into 
+        larger depth estimation with x'*N by y'*N.
+        
+
+        TODO: Find ground elevation in im1. Join bottom and right 
+        layers to im1. Shift top and bottom layers elev according to 
+        elev in im1. Gaussian blur on border to smooth transition.
+
+        Args:
+            images: a list of image matrices to be joined. They will
+                    be joined in linear order. For example an input
+                    of [im1, im2, im3, im4] will become a joined image:     
+                                
+                                    im1 im3
+                                    im2 im4
+        Returns:
+            joined_depth: (2*N)x(2*N) depth estimation
+    ''' 
+    # Take the smallest values in the top-left image to be the ground value:
+    # TODO: this does not work 
+    ground_value = np.min(images[0])
+
+    # mask = np.zeros(images[0].shape)
+    # ground_indices = (images[0] < 50)
+    # print(np.count_nonzero(ground_indices))
+    # mask[ground_indices] = 1
+    # print(images[0], ground_value)
+
+    # cv2.imshow('ground_mask', mask)
+    # cv2.waitKey(0)
+    reference_image = images[0]
+    reference_image = reference_image.reshape((-1,1))
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    K = 2
+    ret, label,center=cv2.kmeans(reference_image, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    # Now convert back into uint8, and make original image
+    center = np.uint8(center)
+    res = center[label.flatten()]
+    res2 = res.reshape((img.shape))
+    cv.imshow('res2',res2)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+        
+    # IM2ELE RGB are 500x500, depth estimations are 440x440 centre crops
+    # RGB overlaps 250 so depth estimations will overlap 130
+
+
+    # TODO: first things first, just join them side by side... find numbering pattern
 
 def center_crop(img, dim): 
 	"""Returns center cropped image
@@ -134,60 +152,73 @@ if __name__ == '__main__':
     blurred_boost_ssims = np.zeros(367)
     filenames = []
 
-    # TODO: loop over all the images to get SSIM + Blur results for all!
     # TODO: Analyze the SSIM for basic blurs. How does the boosts hold up?
     #           is the SSIM for boosts or blurred boosts better? What are 
-    #           the largest/smallest SSIM pairs?
-    for iter, filename in enumerate(os.listdir('test_heights_adjust')):
+    
+    patch_count = 0
+    image_list = []
+    # for iter, filename in enumerate(os.listdir('test_rgbs_base')):  
+    #     patch_count += 1 
+    img_path_1 = f'/media/szwiep/LaCie/im2ele-idvres/boost_max_700_R0/boosted/315000_233500_RGB_0_9.png'
+    img_path_2 = f'/media/szwiep/LaCie/im2ele-idvres/boost_max_700_R0/boosted/315000_233500_RGB_1_9.png'
+    img_1 = cv2.imread(img_path_1)
+    img_2 = cv2.imread(img_path_2)  
+    image_list.append(img_1)
+    image_list.append(img_2)
 
-        RGB_filename = filename.replace('height', 'RGB')
-        ground_truth_path = f'test_heights_adjust/{filename}'
-        boost_path = f'outputs/max_700_R0_all/{RGB_filename}'
-        low_est_filename = RGB_filename.replace('.png', '')
-        single_path = f'outputs/max_700_R0_all/{low_est_filename}low_est.png'
+    join_depth_estimations(image_list)
 
 
-        single = cv2.imread(single_path)
-        boost = cv2.imread(boost_path)
-        ground_t = cv2.imread(ground_truth_path)
+    # for iter, filename in enumerate(os.listdir('test_heights_adjust')):
 
-        # Convert images to grayscale
-        single_gray = cv2.cvtColor(single, cv2.COLOR_BGR2GRAY)
-        boost_gray = cv2.cvtColor(boost, cv2.COLOR_BGR2GRAY)
-        ground_truth = cv2.cvtColor(ground_t, cv2.COLOR_BGR2GRAY)
+    #     RGB_filename = filename.replace('height', 'RGB')
+    #     ground_truth_path = f'test_heights_adjust/{filename}'
+    #     boost_path = f'outputs/max_700_R0_all/{RGB_filename}'
+    #     low_est_filename = RGB_filename.replace('.png', '')
+    #     single_path = f'outputs/max_700_R0_all/{low_est_filename}low_est.png'
 
-        # Crop the ground truth to the required size... IM2ELE stuff
-        ground_truth = center_crop(ground_truth, (440,440))
 
-        ##########################################################
-        # Bilateral filtering stuff
-        #######################################################
+    #     single = cv2.imread(single_path)
+    #     boost = cv2.imread(boost_path)
+    #     ground_t = cv2.imread(ground_truth_path)
+
+    #     # Convert images to grayscale
+    #     single_gray = cv2.cvtColor(single, cv2.COLOR_BGR2GRAY)
+    #     boost_gray = cv2.cvtColor(boost, cv2.COLOR_BGR2GRAY)
+    #     ground_truth = cv2.cvtColor(ground_t, cv2.COLOR_BGR2GRAY)
+
+    #     # Crop the ground truth to the required size... IM2ELE stuff
+    #     ground_truth = center_crop(ground_truth, (440,440))
+
+    #     ##########################################################
+    #     # Bilateral filtering stuff
+    #     #######################################################
         
-        blurred_boost = cv2.bilateralFilter(boost, 9, 100, 180)
-        # cv2.imshow('boost', boost)
-        # cv2.imshow('blurred boost', blurred_boost)
-        # cv2.waitKey(0)
+    #     blurred_boost = cv2.bilateralFilter(boost, 9, 100, 180)
+    #     # cv2.imshow('boost', boost)
+    #     # cv2.imshow('blurred boost', blurred_boost)
+    #     # cv2.waitKey(0)
 
-        blurred_gray = cv2.cvtColor(blurred_boost, cv2.COLOR_BGR2GRAY)
-        midas.utils.write_depth(f'outputs/max_700_R0_all/{low_est_filename}_blur', blurred_boost, bits=2, colored=False)
+    #     blurred_gray = cv2.cvtColor(blurred_boost, cv2.COLOR_BGR2GRAY)
+    #     midas.utils.write_depth(f'outputs/max_700_R0_all/{low_est_filename}_blur', blurred_boost, bits=2, colored=False)
 
-        ##########################################################
-        # SSIM Stuff (How has the structure changes)
-        ##########################################################
+    #     ##########################################################
+    #     # SSIM Stuff (How has the structure changes)
+    #     ##########################################################
     
-        single_ssim, boost_ssim = compare_SSIM(single_gray, boost_gray, ground_truth)
-        _, blur_boost_ssim = compare_SSIM(single_gray, blurred_gray, ground_truth)
+    #     single_ssim, boost_ssim = compare_SSIM(single_gray, boost_gray, ground_truth)
+    #     _, blur_boost_ssim = compare_SSIM(single_gray, blurred_gray, ground_truth)
     
-        filenames.append(filename)
-        single_ssims[iter] = single_ssim
-        boost_ssims[iter] = boost_ssim
-        blurred_boost_ssims[iter] = blur_boost_ssim
+    #     filenames.append(filename)
+    #     single_ssims[iter] = single_ssim
+    #     boost_ssims[iter] = boost_ssim
+    #     blurred_boost_ssims[iter] = blur_boost_ssim
     
 
-    d = {'file': filenames,  'no_boost_ssim': single_ssims, 
-                                'boost_ssim': boost_ssims, 
-                                'blur_boost_ssim': blurred_boost_ssims}
-    boost_ssim_frame = pd.DataFrame(data=d)
-    boost_ssim_frame.to_csv('./boost_ssim_frame_100_180.csv')
+    # d = {'file': filenames,  'no_boost_ssim': single_ssims, 
+    #                             'boost_ssim': boost_ssims, 
+    #                             'blur_boost_ssim': blurred_boost_ssims}
+    # boost_ssim_frame = pd.DataFrame(data=d)
+    # boost_ssim_frame.to_csv('./boost_ssim_frame_100_180.csv')
 
     # show_structural_differences(single_gray, boost_gray)
