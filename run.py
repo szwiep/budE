@@ -340,6 +340,7 @@ def join_depth_estimations(images, dim):
         Returns:
             joined_depth: (dim[0]*N)x(dim[1]*N) depth estimation
     '''
+    # TRY JUST TAKING THE LOWEST VALUE + RANGE IN A TILE AS THE GROUND - segment/threshold with that value!
 
 
 # Generating local patches to perform the local refinement described in section 6 of the main paper.
