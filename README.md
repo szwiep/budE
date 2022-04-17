@@ -1,5 +1,5 @@
 # budE (boosted urban depth estimations)
-A simple pipeline combining [IM2ELE's](https://github.com/speed8928/IMELE) depth estimation for aerial data and [BoostingMonocularDepth's](https://github.com/compphoto/BoostingMonocularDepth) monocular boosting to retrieve higher resolution depth estimations for urban scenes! `budE` can produce clearer building boundaries, demonstrates an increased tolerance to height variability in one image, and is designed to allow for integration of future (or existing) aerial or satellite depth estimation networks.
+A simple pipeline combining [IM2ELE's](https://github.com/speed8928/IMELE) depth estimation for aerial data and [BoostingMonocularDepth's](https://github.com/compphoto/BoostingMonocularDepth) monocular boosting to retrieve higher resolution depth estimations for urban scenes! `budE` can produce clearer building boundaries, demonstrates an increased tolerance to estimating crowded images with high hieght variability, and is designed to allow for integration of future (or existing) aerial or satellite depth estimation networks.
 
 # Getting Started
 
