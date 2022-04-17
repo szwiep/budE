@@ -24,4 +24,3 @@ dataset_prepare/midas/model.pt
 /inputs
 /im2ele/Block0_skip_model_110.pth.tar
 /im2ele/models/senet154-c7b49a05.pth
-*.csv
