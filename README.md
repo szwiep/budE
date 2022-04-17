@@ -1,4 +1,4 @@
-# boosted-urban
+# budE (boosted urban depth estimations)
 A simple pipeline for boosting aerial or satellite-captured urban scene depth estimations.
 
 # Citations
