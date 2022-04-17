@@ -96,6 +96,7 @@ def boost_urban_aerial(dataset, option):
         img = dataset[0]
         img_rgb = img.rgb_image
         whole_size_threshold = interactive_max_threshold(img_rgb)
+        torch.cuda.empty_cache()
     else:
         whole_size_threshold = 700 # Hard-coded choice. Taken from experimentation with IM2ELE
     print(f'Maximum high resolution set as: {whole_size_threshold}\n')
@@ -136,7 +137,7 @@ def boost_urban_aerial(dataset, option):
                                                                         whole_size_threshold)
     # NOTE: hard-coded because IM2ELE crops the images as part of the data transform
     input_resolution = [440, 440, 3] # Typically this would be: input_resolution = img.shape()
-    print(f'Double estimation process using {input_resolution[0]} as low-res, and {whole_image_optimal_size} as high-res.')
+    print(f'Double estimation process using {input_resolution[0]} as low-res and {whole_image_optimal_size} as high-res.')
     print(f'Beginning depth estimation for boosting...')
     for image_ind, images in enumerate(tqdm(dataset)):
         # Load image from dataset
@@ -150,11 +151,11 @@ def boost_urban_aerial(dataset, option):
         # Save the boosted depth estimation and exit pipeline.
         if not option.local_boost:
             if option.bilateral_blur:
-                whole_estimate = cv2.bilateralFilter(whole_estimate, 9, 100, 180) # these params still need to be tinkered with
+                whole_estimate = cv2.bilateralFilter(whole_estimate, 9, 100, 180) # Can still be tinkered with. Based on analyze.py results
             boostingMonocularDepth.midas.utils.write_depth(path, cv2.resize(whole_estimate, (input_resolution[1], input_resolution[0]),
                                                     interpolation=cv2.INTER_CUBIC),
                                     bits=2, colored=option.colorize_results)    
-
+            continue
         # The remaining section deals with local boosting via patch estimates on larger resolution 
         # images not constrained by R20 as outlined in Section 6 of Miangoleh & Dille (2021). 
         #
@@ -183,7 +184,7 @@ def boost_urban_aerial(dataset, option):
                                     (input_resolution[1], input_resolution[0]),
                                     interpolation=cv2.INTER_CUBIC), bits=2, colored=option.colorize_results)
                                            
-    print(f'Boosting of aerial/satellite urban depth estimation complete. See results in {path}')
+    print(f'Boosting of aerial/satellite urban depth estimation complete. See results in {result_dir}')
 
 def interactive_max_threshold(rgb_image):
     ''' Produces a plot of depth estimations at different resolutions using 
@@ -216,16 +217,16 @@ def interactive_max_threshold(rgb_image):
     plt.subplots_adjust(wspace=0, hspace=5)
     plt.show(block=False)
 
-    print( 'whole_size_threshold will set the limit for how large the input image can be upsampled to. '\
-            ' See the figure for an example of how your input images behave with the depth '\
-            ' estimation model at different input resolutions.\n')
+    print( 'whole_size_threshold will set the limit for how large the input image can be upsampled to '\
+            ' in the boosting process (high-res will never exceed it). See the figure for an example '\
+            ' of how your input images behave with the depth estimation model at different input resolutions.\n ')
     choice = None
     while choice is None:
         try:
             selection = int(input(f'Select one of {resolutions[1:]} as the max threshold: '))
         except ValueError:
             print(f'"{selection}" is not in {resolutions}.')
-        if selection not in resolutions:
+        if selection not in resolutions:    
             print(f'{selection} is not in {resolutions}.')
         else:
             confirmation = input(f'Select {selection} as the max threshold? (Y)es or (N)o? ')
@@ -266,7 +267,7 @@ if __name__ == "__main__":
     if option_.depthNet == 0:
         option_.net_receptive_field_size = 440 # Training resolution of IM2ELE
         option_.patch_netsize = 2 * option_.net_receptive_field_size
-    # YOUR MODEL CODE HERE 
+    # YOUR MODEL CODE HERE (set as CLI arg)
     # if option.depthNet == 1:
     #   option_.net_receptive_field_size = your_models_receptive_field 
     #   option_.patch_netsize = 2 * option_.net_receptive_field_size
