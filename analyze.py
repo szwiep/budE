@@ -1,3 +1,11 @@
+''' Scratch-pad file used in the development of the budE pipeline. 
+
+Most logic concerned with exploring the SSIM of boost vs. 
+non-boosted depth estimations on the IM2ELE network. This file 
+is kept in the budE project source-code to maintain a record
+of at least some of the methods used to justify the simplifications
+in the project structure.
+'''
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,18 +21,8 @@ from matplotlib.figure import Figure
 from skimage.metrics import structural_similarity
 
 def show_structural_differences(gray_single, gray_boost):
-    
-    # single = 'outputs/max_700_R0_all/315000_233500_RGB_5_2.png'
-    # boost = 'outputs/max_700_R0_all/315000_233500_RGB_5_2low_est.png'
-
     # # SSIM thresholding to find very different items
     # # https://stackoverflow.com/questions/56183201/detect-and-visualize-differences-between-two-images-with-opencv-python
-    # before = cv2.imread(single)
-    # after = cv2.imread(boost)
-
-    # # Convert images to grayscale
-    # before_gray = cv2.cvtColor(before, cv2.COLOR_BGR2GRAY)
-    # after_gray = cv2.cvtColor(after, cv2.COLOR_BGR2GRAY)
 
     # Compute SSIM between two images
     (score, diff) = structural_similarity(gray_single, gray_boost, full=True)
@@ -69,13 +67,8 @@ def compare_SSIM(single, boost, ground_truth):
     (score, diff) = structural_similarity(single, ground_truth, full=True)
     diff = (diff * 255).astype("uint8")
 
-
     (boost_score, boost_diff) = structural_similarity(boost, ground_truth, full=True)
     diff = (boost_diff * 255).astype("uint8")
-
-
-    # 6. You can print only the score if you want
-    # print("SSIM single: {}, SSIM boost: {}".format(score, boost_score))
 
     return score, boost_score
 

@@ -1,3 +1,5 @@
+
+import torch
 from operator import getitem
 from torchvision.transforms import Compose
 from torchvision.transforms import transforms
@@ -6,12 +8,81 @@ from torchvision.utils import save_image
 from im2ele.estimate import estimateim2ele
 
 import boostingMonocularDepth.midas.utils 
-from boostingMonocularDepth.utils import generatemask, ImageandPatchs, rgb2gray, applyGridpatch, getGF_fromintegral
+from boostingMonocularDepth.utils import generatemask, resizewithpool, ImageandPatchs, rgb2gray, applyGridpatch, getGF_fromintegral
 
-import numpy as np
-import torch
-import cv2
+from boostingMonocularDepth.pix2pix.models.pix2pix4depth_model import Pix2Pix4DepthModel
+from boostingMonocularDepth.pix2pix.options.test_options import TestOptions
+
 import os
+import cv2
+import numpy as np
+
+
+def load_merge_network(save_dir, load_type):
+    opt = TestOptions().parse()
+    pix2pixmodel = Pix2Pix4DepthModel(opt)
+    pix2pixmodel.save_dir = save_dir
+    pix2pixmodel.load_networks(load_type)
+    pix2pixmodel.eval()
+    return pix2pixmodel
+
+# TODO: play around with this
+def calculateprocessingres(img, basesize, confidence=0.1, scale_threshold=3, whole_size_threshold=3000):
+    # Returns the R_x resolution described in section 5 of the main paper.
+
+    # Parameters:
+    #    img :input rgb image
+    #    basesize : size the dilation kernel which is equal to receptive field of the network.
+    #    confidence: value of x in R_x; allowed percentage of pixels that are not getting any contextual cue.
+    #    scale_threshold: maximum allowed upscaling on the input image ; it has been set to 3.
+    #    whole_size_threshold: maximum allowed resolution. (R_max from section 6 of the main paper)
+
+    # Returns:
+    #    outputsize_scale*speed_scale :The computed R_x resolution
+    #    patch_scale: K parameter from section 6 of the paper
+
+    # speed scale parameter is to process every image in a smaller size to accelerate the R_x resolution search
+    speed_scale = 32
+    image_dim = int(min(img.shape[0:2]))
+
+    gray = rgb2gray(img)
+    grad = np.abs(cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)) + np.abs(cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3))
+    grad = cv2.resize(grad, (image_dim, image_dim), cv2.INTER_AREA)
+
+    # thresholding the gradient map to generate the edge-map as a proxy of the contextual cues
+    m = grad.min()
+    M = grad.max()
+    middle = m + (0.4 * (M - m))
+    grad[grad < middle] = 0
+    grad[grad >= middle] = 1
+
+    # dilation kernel with size of the receptive field
+    kernel = np.ones((int(basesize/speed_scale), int(basesize/speed_scale)), np.float)
+    # dilation kernel with size of the a quarter of receptive field used to compute k
+    # as described in section 6 of main paper
+    kernel2 = np.ones((int(basesize / (4*speed_scale)), int(basesize / (4*speed_scale))), np.float)
+
+    # Output resolution limit set by the whole_size_threshold and scale_threshold.
+    threshold = min(whole_size_threshold, scale_threshold * max(img.shape[:2]))
+
+    outputsize_scale = basesize / speed_scale
+    for p_size in range(int(basesize/speed_scale), int(threshold/speed_scale), int(basesize / (2*speed_scale))):
+        grad_resized = resizewithpool(grad, p_size)
+        grad_resized = cv2.resize(grad_resized, (p_size, p_size), cv2.INTER_NEAREST)
+        grad_resized[grad_resized >= 0.5] = 1
+        grad_resized[grad_resized < 0.5] = 0
+
+        dilated = cv2.dilate(grad_resized, kernel, iterations=1)
+        meanvalue = (1-dilated).mean()
+        if meanvalue > confidence:
+            break
+        else:
+            outputsize_scale = p_size
+
+    grad_region = cv2.dilate(grad_resized, kernel2, iterations=1)
+    patch_scale = grad_region.mean()
+
+    return int(outputsize_scale*speed_scale), patch_scale
 
 # TODO: remove os. calls from here. That should be handled by main pipeline!
 def local_boosting(option, images, patch_scale, input_resolution, whole_estimate, whole_size_threshold, whole_image_optimal_size):
@@ -91,6 +162,69 @@ def local_boosting(option, images, patch_scale, input_resolution, whole_estimate
 
     return imageandpatchs, mask_org
 
+def get_patch_information(patch_ind, imageandpatchs):
+    # Get patch information
+    patch = imageandpatchs[patch_ind] # patch object
+    patch_rgb = patch['patch_rgb'] # rgb patch
+    patch_whole_estimate_base = patch['patch_whole_estimate_base'] # corresponding patch from base
+    rect = patch['rect'] # patch size and location
+    patch_id = patch['id'] # patch ID
+    org_size = patch_whole_estimate_base.shape # the original size from the unscaled input
+    print('\t processing patch', patch_ind, '|', rect)
+
+    return patch_rgb, patch_whole_estimate_base, rect, patch_id, org_size
+
+
+def merge_patch_estimations(option, patch_estimation, patch_whole_estimate_base, imageandpatchs, pix2pixmodel, mask_org, rect, org_size):
+    mask = mask_org.copy()
+    patch_estimation = cv2.resize(patch_estimation, (option.pix2pixsize, option.pix2pixsize),
+                                            interpolation=cv2.INTER_CUBIC)
+
+    patch_whole_estimate_base = cv2.resize(patch_whole_estimate_base, (option.pix2pixsize, option.pix2pixsize),
+                                        interpolation=cv2.INTER_CUBIC)
+
+    # Merging the patch estimation into the base estimate using our merge network:
+    # We feed the patch estimation and the same region from the updated base estimate to the merge network
+    # to generate the target estimate for the corresponding region.
+    pix2pixmodel.set_input(patch_whole_estimate_base, patch_estimation)
+
+    # Run merging network
+    pix2pixmodel.test()
+    visuals = pix2pixmodel.get_current_visuals()
+
+    prediction_mapped = visuals['fake_B']
+    prediction_mapped = (prediction_mapped+1)/2
+    prediction_mapped = prediction_mapped.squeeze().cpu().numpy()
+
+    mapped = prediction_mapped
+
+    # We use a simple linear polynomial to make sure the result of the merge network would match the values of
+    # base estimate
+    p_coef = np.polyfit(mapped.reshape(-1), patch_whole_estimate_base.reshape(-1), deg=1)
+    merged = np.polyval(p_coef, mapped.reshape(-1)).reshape(mapped.shape)
+
+    merged = cv2.resize(merged, (org_size[1],org_size[0]), interpolation=cv2.INTER_CUBIC)
+
+    # Get patch size and location
+    w1 = rect[0]
+    h1 = rect[1]
+    w2 = w1 + rect[2]
+    h2 = h1 + rect[3]
+
+    # To speed up the implementation, we only generate the Gaussian mask once with a sufficiently large size
+    # and resize it to our needed size while merging the patches.
+    if mask.shape != org_size:
+        mask = cv2.resize(mask_org, (org_size[1],org_size[0]), interpolation=cv2.INTER_LINEAR)
+
+    tobemergedto = imageandpatchs.estimation_updated_image
+
+    # Update the whole estimation:
+    # We use a simple Gaussian mask to blend the merged patch region with the base estimate to ensure seamless
+    # blending at the boundaries of the patch region.
+    tobemergedto[h1:h2, w1:w2] = np.multiply(tobemergedto[h1:h2, w1:w2], 1 - mask) + np.multiply(merged, mask)
+    imageandpatchs.set_updated_estimate(tobemergedto)
+    ##### Should return imageandpatchs.estimation_updated_image 
+    return imageandpatchs.estimation_updated_image
 
 # Adaptively select patches
 def adaptiveselection(integral_grad, patch_bound_list, gf):
@@ -171,7 +305,7 @@ def generatepatchs(img, base_size):
     patch_bound_list = adaptiveselection(grad_integral_image, patch_bound_list, gf)
 
     # Sort the patch list to make sure the merging operation will be done with the correct order: starting from biggest
-    # patch
+    # patchpatch_in
     patchset = sorted(patch_bound_list.items(), key=lambda x: getitem(x[1], 'size'), reverse=True)
     return patchset
 
@@ -201,7 +335,7 @@ def doubleestimate(img, size1, size2, pix2pixsize, pix2pixmodel, net_type, depth
 
     return prediction_mapped
 
-
+# TODO this isn't great anymore. estimateim2ele should be pulled in here
 # Generate a single-input depth estimation
 def singleestimate(img, msize, net_type, model, device):
     # if msize > GPU_threshold:

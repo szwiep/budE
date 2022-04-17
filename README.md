@@ -19,3 +19,8 @@ Liu, C.-J.; Krylov, V.A.; Kane, P.; Kavanagh, G.; Dahyot, R.
 Remote Sens. 2020, 12, 2719.
 DOI:10.3390/rs12172719
 
+Get the SNET: http://data.lip6.fr/cadene/pretrainedmodels/senet154-c7b49a05.pth
+
+Get the IM2ELE:
+
+Get the BoostingMonocularDepth Merge Model: 

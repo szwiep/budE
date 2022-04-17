@@ -628,6 +628,8 @@ def initialize_pretrained_model(model, num_classes, settings):
     assert num_classes == settings['num_classes'], \
         'num_classes should be {}, but is {}'.format(
             settings['num_classes'], num_classes)
+    print('Loading pre-trained SENET model for IM2ELE...')
+    # model.load_state_dict(model_zoo.load_url(settings['url'], 'pretrained_model/encoder'))
     model.load_state_dict(torch.load('im2ele/models/senet154-c7b49a05.pth'))
     model.input_space = settings['input_space']
     model.input_size = settings['input_size']

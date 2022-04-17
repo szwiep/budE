@@ -10,8 +10,11 @@ import cv2
 
 def estimateim2ele(img, msize, im2elemodel, device):
     # Adapted from IM2ELEVATION source code: https://github.com/speed8928/IMELE
-    # Crop to 440x440 to match cropped training 
     crop = CenterCrop([440, 440])
+
+    # IM2ELE transforms require images be in PIL format. PIL Images are 
+    # centre cropped to 440x440, resized with BICUBIC interporlation, 
+    # then normalized with ImageNet stats. After this they can evaluated.
     img_pil = crop(Image.fromarray((img * 255).astype(np.uint8)))
     img_resize = img_pil.resize((msize, msize), resample=Image.BICUBIC, box=None, reducing_gap=None)
 
@@ -26,6 +29,8 @@ def estimateim2ele(img, msize, im2elemodel, device):
         sample = torch.unsqueeze(img_torch, 0).to(device)  
         prediction = im2elemodel(sample)
     
+    # NOTE: an estimation function should return image as NumPy array on the CPU 
+    #           NumPy is the format that budE and BoostingMonocularDepth expect.
     prediction = prediction.squeeze().cpu().numpy()
     prediction = cv2.resize(prediction, (440, 440), interpolation=cv2.INTER_CUBIC)
 

@@ -69,9 +69,11 @@ class BaseOptions():
         parser.add_argument('--depthNet', type=int, required=False, help='0: midas 1:strurturedRL')
         parser.add_argument('--R0', action='store_true')
         parser.add_argument('--R20', action='store_true')
-        parser.add_argument('--Final', action='store_true')
+        parser.add_argument('--local_boost', action='store_true')
         parser.add_argument('--colorize_results', action='store_true')
-        parser.add_argument('--max_res', type=float, default=np.inf)
+        parser.add_argument('--bilateral_blur',  action='store_true')
+        parser.add_argument('--interactive_max',  action='store_true')
+
 
         self.initialized = True
         return parser
@@ -139,7 +141,7 @@ class BaseOptions():
             suffix = ('_' + opt.suffix.format(**vars(opt))) if opt.suffix != '' else ''
             opt.name = opt.name + suffix
 
-        self.print_options(opt)
+        # self.print_options(opt) # Printing test options removed for budE pipeline. 
 
         # set gpu ids
         str_ids = opt.gpu_ids.split(',')
