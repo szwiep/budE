@@ -38,7 +38,7 @@ Do you have a CNN aerial or satellite depth estimation model you want to try out
 `yourDepthEstModel/` should contain (1) the model definition/class (2) the model weights, and (3) a function which takes one (un-transformed) image as a NumPy array, uses your model to estimate a depth estimation ([see im2ele/estimate.py](https://github.com/szwiep/budE/blob/main/im2ele/estimate.py) for reference) and returns the result.
 
 - Update `boost_urban_aerial.py` according to the _`# YOUR MODEL HERE`_ comments.
-- And you're off! 
+- And you're off :rocket: Happy boosting!  
 
 If you have any questions or difficulties setting up `budE` with your model, feel free to reach out to any of the project maintainers!
 
