@@ -1,10 +1,10 @@
 torch==1.2
 torchvision
-cudnnenv
-gradio
 matplotlib
 opencv-python
 scikit-image
+numpy
+pandas
 scipy
 gdown
 
